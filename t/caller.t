@@ -9,7 +9,7 @@ sub flatten {  ## In case !$has_diff
     join( "",
         map(
             "[" . join( ",", map defined $_ ? "'$_'" : "undef", @$_ ) . "]\n",
-            @{shift()}
+            shift()
         )
     );
 }
@@ -25,6 +25,7 @@ sub aok {
             flatten( $_[1] ),
             @_[2..$#_],
         );
+        goto &ok;
     }
 }
 
