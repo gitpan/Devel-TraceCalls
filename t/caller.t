@@ -66,6 +66,8 @@ sub stack {
 
 sub dive {
     my ( $context, $depth ) = @_;
+    Devel::TraceCalls::emit_trace_message( "in dive" )
+        if defined &Devel::TraceCalls::emit_trace_message;
     $depth ||= 1;
     $depth >= 3
         ? stack( $context )

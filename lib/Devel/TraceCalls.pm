@@ -49,6 +49,11 @@ Devel::TraceCalls - Track calls to subs, classes and object instances
 
     undef $t;  ## disable tracing
 
+  ## Emitting additional messages:
+    use Devel::TraceCalls qw( emit_trace_message );
+
+    emit_trace_message( "ouch!" );
+
 =head1 DESCRIPTION
 
 B<ALPHA CODE ALERT.  This module may change before "official" release">.
@@ -171,6 +176,24 @@ The first form (C<track $obj, ...>) enables all capture options,
 including CaptureSelf.
 
 =back
+
+=head2 Emitting messages if and only if Devel::TraceCalls is loaded
+
+    use constant _tracing => defined $Devel::TraceCalls::VERSION;
+
+    BEGIN {
+        eval "use Devel::TraceCalls qw( emit_trace_message )"
+            if _tracing;
+    }
+
+    emit_trace_message( "hi!" ) if _tracing;
+
+Using the constant C<_tracing> allows expressions like
+
+    emit_trace_message(...) if _tracing;
+
+to be optimized away at compile time, resulting in little or
+no performance penalty.
 
 =head1 OPTIONS
 
@@ -318,7 +341,7 @@ Result, plain stringification is used for Self.
 
 =cut
 
-$VERSION = 0.02;
+$VERSION = 0.03;
 
 @ISA = qw( Exporter );
 @EXPORT = qw( trace_calls );
@@ -898,22 +921,25 @@ confess unless defined $trace_points{$sub_id}->{TracePoints};
     ## avoid the subroutine prototypes
     my $call_time;
     my $return_time;
+    my $no_exception;
     if ( $context ) {
         $call_time = time if $record_call_time;
-        @result = eval { &$sub_ref( @_ ) };
+        eval { @result = &$sub_ref( @_ ); $no_exception = 1 };
         $return_time = time if $record_return_time;
     }
     elsif ( defined $context ) {
         $call_time = time if $record_call_time;
-        $result[0] = &$sub_ref( @_ );
+        eval { $result[0] = &$sub_ref( @_ ); $no_exception = 1 };
         $return_time = time if $record_return_time;
     }
     else {
         $call_time = time if $record_call_time;
-        &$sub_ref( @_ ); ## DON'T BREAK THE VOID CONTEXT IF YOU EDIT THIS.
+        ## DON'T BREAK THE VOID CONTEXT IF YOU EDIT THIS.
+        eval { &$sub_ref( @_ ); $no_exception = 1 };
         $return_time = time if $record_return_time;
     }
-    my $exception = $@;
+    my $exception;
+    $exception = $@ unless $no_exception;
 
     for my $tp ( reverse @tps ) {
         my $r = pop @r;
@@ -926,10 +952,11 @@ confess unless defined $trace_points{$sub_id}->{TracePoints};
             map ref $_ ? Dumper( $_ ) : $_, @result
         ];
         $tp->{PostCall}->( $r, \@_ ) if $tp->{PostCall};
-        $r->{Exception}  = "$exception";
+        $r->{Exception}  = "$exception" if defined $exception;
 
         if ( $exception && $tp->{LogTo} && ref $tp->{LogTo} ne "ARRAY" ) {
             my $l = $tp->{_LogInfo};
+
             my $msg = join( "",
                 "EXCEPTION:",
                 $l->{Prefix} || "",
@@ -1071,6 +1098,42 @@ sub trace_calls {
 
 my $devel_trace_calls_pkg_re = "^" . __PACKAGE__;
 $devel_trace_calls_pkg_re = qr/$devel_trace_calls_pkg_re/;
+
+sub emit_trace_message {
+    local $Data::Dumper::Indent    = 1;
+    local $Data::Dumper::Terse     = 1;
+    local $Data::Dumper::Quotekeys = 0;
+
+    ## use local on this one just in case some exception happens,
+    ## or an "exiting subroutine via next" kinda thing.
+
+    my $msg = join "", map {
+        my $d = ref()
+            ? Dumper(
+                $stringify_blessed_refs
+                    ? _stringify_blessed_refs $_
+                    : $_
+            )
+            : $_;
+        chomp $d;
+        $d;
+    } @_;
+
+    chomp $msg;
+    $msg .= "\n";
+
+    my $indent = "| ! " x ( $nesting_level >> 1 );
+    $indent .= "| " if $nesting_level & 1;
+
+    $msg =~ s{(.)^}{
+        $1 . "     : $indent|   "
+    }gmes;
+
+    $indent =~ s/..$/+=/;
+
+    ## TODO: allow log formatting and emission to custom trace destinations.
+    print STDERR "TRACE: ", $indent, $msg;
+};
 
 =head1 OO API
 
