@@ -318,7 +318,7 @@ Result, plain stringification is used for Self.
 
 =cut
 
-$VERSION = 0.011;
+$VERSION = 0.02;
 
 @ISA = qw( Exporter );
 @EXPORT = qw( trace_calls );
