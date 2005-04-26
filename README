@@ -84,6 +84,12 @@ DESCRIPTION
                 ...options...
             };
 
+            # Multiple package names
+            trace_calls {
+                Package => [ "My::Module", "Another::Module" ],
+                ...options...
+            };
+
             trace_calls {
                 Package => "My::Module",
                 Subs    => [ "foo", "bar" ],

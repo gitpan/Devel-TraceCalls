@@ -100,6 +100,12 @@ By Package Name
         ...options...
     };
 
+    # Multiple package names
+    trace_calls {
+        Package => [ "My::Module", "Another::Module" ],
+        ...options...
+    };
+
     trace_calls {
         Package => "My::Module",
         Subs    => [ "foo", "bar" ],
@@ -341,7 +347,7 @@ Result, plain stringification is used for Self.
 
 =cut
 
-$VERSION = 0.03;
+$VERSION = 0.04;
 
 @ISA = qw( Exporter );
 @EXPORT = qw( trace_calls );
@@ -1229,11 +1235,18 @@ sub add_trace_points {
                     ## We don't want to look at @ISA, so grab the sub
                     ## names manually instead of calling _get_methods
                     no strict "refs";
-                    my @sub_names = grep
-                        defined &$_,
-                        map "${p}::$_",
-                            keys %{"${p}::"};
-                    push @trace_points, _get_named_subs @sub_names, $parm;
+                    my @sub_names;
+                    my @packages = $p;
+                    @packages = @$p if ref $p eq 'ARRAY';
+
+                    for my $pkg (@packages)
+                    {
+                        @sub_names = grep
+                            defined &$_,
+                            map "${pkg}::$_",
+                                keys %{"${pkg}::"};
+                        push @trace_points, _get_named_subs @sub_names, $parm;
+                    }
                 }
             }
             elsif ( exists $parm->{Class} ) {
@@ -1631,6 +1644,9 @@ a client module.
 =head1 AUTHOR
 
     Barrie Slaymaker <barries@slaysys.com>
+
+    Maintainer from version 0.04 is
+    Cosimo Streppone <cosimo@cpan.org>
 
 =head1 COPYRIGHT
 

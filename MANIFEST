@@ -9,3 +9,4 @@ t/caller.t
 t/methods.t
 t/subs.t
 t/use.t
+META.yml                                 Module meta-data (added by MakeMaker)
